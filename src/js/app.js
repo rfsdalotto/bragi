@@ -175,44 +175,115 @@ var actual_anim_frame = 0;
 var last_frame;
 
 function drawAnimation() {
-    var anim_points = frames[actual_anim_frame];
-    if (last_frame !== undefined) {
-        for (var lap = 0; lap < frames[last_frame]; lap++) {
-            var point = frames[last_frame][lap];
-            stage.removeChild(point);
-        }
-        $('[data-frame="' + last_frame + '"]').css('opacity', 0.7);
-    }
-    $('[data-frame="' + actual_anim_frame + '"]').css('opacity', 1);
+    cleanCanvas();
+    startAnimation();
+}
 
-    removeLastLastFrame();
-    for (var ap = 0; ap < anim_points.length; ap++) {
-        var point = anim_points[ap];
+function startAnimation() {
+    var actual = copy(frames[1]);
+    var last = copy(frames[0]);
+
+    interpolateAndUpdate(actual, last);
+}
+
+function interpolateAndUpdate(actual, last) {
+    console.log(actual, last, actual_anim_frame);
+
+    stage.removeAllChildren();
+    var next_frame = true;
+
+    for (var l = 0; l < last.length; l++) {
+        var lastframepoint = last[l];
         var circle = new createjs.Shape();
         circle.graphics.beginStroke('rgba(0, 255, 0, 1)').beginFill('rgba(0, 255, 0, 0.2)').drawCircle(0, 0, 2);
-        circle.x = point.x;
-        circle.y = point.y;
+        last[l].x += (actual[l].x - last[l].x) * .1;
+        last[l].y += (actual[l].y - last[l].y) * .1;
+        circle.x = last[l].x;
+        circle.y = last[l].y;
         stage.addChild(circle);
-        lastFramePoints.push(circle);
-        if (point.parent_node !== undefined) {
-            var parent = anim_points[point.parent_node];
+
+        if(actual[last[l].parent_node] !== undefined){
             var line = new createjs.Shape();
-            stage.addChild(line);
             line.graphics.setStrokeStyle(1).beginStroke("rgba(0, 255, 0, 1)");
-            line.graphics.moveTo(point.x, point.y);
-            line.graphics.lineTo(parent.x, parent.y);
-            lastFrameLines.push(line);
+            line.graphics.moveTo(lastframepoint.x, lastframepoint.y);
+            line.graphics.lineTo(last[lastframepoint.parent_node].x, last[lastframepoint.parent_node].y);
+            stage.addChild(line);
+        }
+
+        var x = circle.x;
+        var y = circle.y;
+        var tx = actual[l].x;
+        var ty = actual[l].y;
+
+        var ok = true;
+        var xdiff = parseInt(x - tx);
+        var ydiff = parseInt(y - ty);
+
+        // console.log(xdiff, 'x');
+        // console.log(ydiff, 'y');
+    
+        if(xdiff >= -1 && xdiff <= 1){
+
+        }
+        else{
+            next_frame = false;
+        }
+        
+        if(ydiff >= -1 && ydiff <= 1){
+
+        }
+        else{
+            next_frame = false;
         }
     }
-    last_frame = actual_anim_frame;
-    actual_anim_frame++;
-    if (actual_anim_frame > frames.length - 1) {
-        actual_anim_frame = 0;
+
+    if (next_frame === true) {
+        setTimeout(function () {
+            actual_anim_frame++;
+            console.log(actual_anim_frame >= frames.length);
+
+            if (actual_anim_frame >= frames.length) {
+                console.log('if');
+                actual_anim_frame = 0;
+                actual = copy(frames[1]);
+                last = copy(frames[0]);
+            }
+            else{
+                console.log('else');
+                actual = copy(frames[actual_anim_frame]);
+                last = copy(frames[actual_anim_frame - 1]);
+            }            
+
+            interpolateAndUpdate(actual, last);
+        }, 16);
     }
+    else {
+        setTimeout(function () {
+            interpolateAndUpdate(actual, last);
+        }, 16);
+    }
+
     stage.update();
-    is_animating = false;
-    console.log(actual_anim_frame)
-    animateToNextFrame(deepClone(frames[last_frame]), deepClone(frames[actual_anim_frame]));
+}
+
+function checkPosition(x, y, tx, ty){
+    var ok = true;
+    var xdiff = parseInt(x - tx);
+    var ydiff = parseInt(y - ty);
+
+    if(xdiff <= -1 && xdiff >= 1){
+        ok = false;
+    }
+    
+    if(ydiff <= -1 && ydiff >= 1){
+        ok = false;
+    }
+
+    return ok;
+}
+
+function copy(arr){
+    return JSON.parse(JSON.stringify(arr));
 }
 
 function animateToNextFrame(actualf, nextf) {
@@ -229,14 +300,14 @@ function animateToNextFrame(actualf, nextf) {
             if (actualpoint.x <= nextpoint.x) {
                 diffx = (nextpoint.x - actualpoint.x) / 60;
             }
-            else{
+            else {
                 diffx = (actualpoint.x - nextpoint.x) / 60;
             }
 
             if (actualpoint.y <= nextpoint.y) {
                 diffy = (nextpoint.y - actualpoint.y) / 60;
             }
-            else{
+            else {
                 diffy = (actualpoint.y - nextpoint.y) / 60;
             }
 
@@ -244,7 +315,7 @@ function animateToNextFrame(actualf, nextf) {
             var diffycopy = diffy;
 
             if (diffx < 1) { diffx = diffx * 60; }
-            if (diffy < 1) { diffy = diffy * 60; }          
+            if (diffy < 1) { diffy = diffy * 60; }
 
             if (diffxcopy < 0) { diffxcopy = diffxcopy * -1; }
             if (diffycopy < 0) { diffycopy = diffycopy * -1; }
@@ -312,8 +383,7 @@ function deepClone(obj, hash = new WeakMap()) {
         key => ({ [key]: deepClone(obj[key], hash) })));
 }
 
-function addNewFrame() {
-    addNewFrameUI();
+function createActualCopy() {
     var pointscopy = [];
     for (var p = 0; p < points.length; p++) {
         var realpoint = points[p];
@@ -323,12 +393,15 @@ function addNewFrame() {
 
         pointscopy.push(newpoint);
     }
-    frames[actualframe] = pointscopy;
-    console.log(actualframe);
+    return pointscopy;
+}
+
+function addNewFrame() {
+    addNewFrameUI();
+    frames[actualframe] = createActualCopy();
     actualframe++;
-    console.log('ok2');
     removeLastLastFrame();
-    drawLastFrame(actualframe - 1);
+    drawFrame(actualframe - 1);
 }
 
 function addNewFrameUI() {
@@ -337,6 +410,10 @@ function addNewFrameUI() {
     $('[data-frame="' + actualframe + '"]').css('background-image', 'url(' + dataURLstring + ')');
     var nextframe = actualframe + 1;
     $('.js-add-frame').before('<div class="frame js-goto-frame" data-frame="' + nextframe + '"> <p>' + nextframe + '</p> </div>');
+}
+
+function cleanCanvas() {
+
 }
 
 function removeLastLastFrame() {
@@ -352,7 +429,7 @@ function removeLastLastFrame() {
 
 var lastFramePoints = [];
 var lastFrameLines = [];
-function drawLastFrame(frameindex) {
+function drawFrame(frameindex) {
     for (var lp = 0; lp < frames[frameindex].length; lp++) {
         var point = frames[frameindex][lp];
         var circle = new createjs.Shape();
