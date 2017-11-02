@@ -186,103 +186,108 @@ function startAnimation() {
     interpolateAndUpdate(actual, last);
 }
 
+var time = .16;
+var mantain = [];
+var count_ = 0;
+
 function interpolateAndUpdate(actual, last) {
-    console.log(actual, last, actual_anim_frame);
+    var cancontinue = 0;
 
     stage.removeAllChildren();
-    var next_frame = true;
-
-    for (var l = 0; l < last.length; l++) {
-        var lastframepoint = last[l];
+    for (var i = 0; i < actual.length; i++) {
+        var l = lerp([last[i].x, last[i].y], [actual[i].x, actual[i].y], time);
+        console.log(l);
         var circle = new createjs.Shape();
-        circle.graphics.beginStroke('rgba(0, 255, 0, 1)').beginFill('rgba(0, 255, 0, 0.2)').drawCircle(0, 0, 2);
-        last[l].x += (actual[l].x - last[l].x) * .1;
-        last[l].y += (actual[l].y - last[l].y) * .1;
-        circle.x = last[l].x;
-        circle.y = last[l].y;
-        stage.addChild(circle);
+        circle.graphics.beginStroke("#ff0000").beginFill('rgba(255,0,0)').drawCircle(0, 0, 2);
+        circle.x = l[0];
+        circle.y = l[1];
 
-        if(actual[last[l].parent_node] !== undefined){
-            var line = new createjs.Shape();
-            line.graphics.setStrokeStyle(1).beginStroke("rgba(0, 255, 0, 1)");
-            line.graphics.moveTo(lastframepoint.x, lastframepoint.y);
-            line.graphics.lineTo(last[lastframepoint.parent_node].x, last[lastframepoint.parent_node].y);
+        last[i].x = l[0];
+        last[i].y = l[1];
+        var dist = Math.sqrt(Math.pow((l[0]-actual[i].x), 2) + Math.pow((l[1]-actual[i].y), 2) );
+        cancontinue += dist;
+
+        var line = new createjs.Shape();
+        if(last[last[i].parent_node]){            
+            line.graphics.setStrokeStyle(1).beginStroke("rgba(255,0,0,0.7)");
+            line.graphics.moveTo(last[i].x, last[i].y);
+            line.graphics.lineTo(last[last[i].parent_node].x, last[last[i].parent_node].y);
+        }
+
+        if(count_ % 3 === 0){
+            mantain.push(circle);
+            mantain.push(line);
+        }
+        else{
+            stage.addChild(circle);
             stage.addChild(line);
         }
-
-        var x = circle.x;
-        var y = circle.y;
-        var tx = actual[l].x;
-        var ty = actual[l].y;
-
-        var ok = true;
-        var xdiff = parseInt(x - tx);
-        var ydiff = parseInt(y - ty);
-
-        // console.log(xdiff, 'x');
-        // console.log(ydiff, 'y');
-    
-        if(xdiff >= -1 && xdiff <= 1){
-
-        }
-        else{
-            next_frame = false;
-        }
-        
-        if(ydiff >= -1 && ydiff <= 1){
-
-        }
-        else{
-            next_frame = false;
-        }
     }
 
-    if (next_frame === true) {
-        setTimeout(function () {
-            actual_anim_frame++;
-            console.log(actual_anim_frame >= frames.length);
 
-            if (actual_anim_frame >= frames.length) {
-                console.log('if');
-                actual_anim_frame = 0;
-                actual = copy(frames[1]);
-                last = copy(frames[0]);
-            }
-            else{
-                console.log('else');
-                actual = copy(frames[actual_anim_frame]);
-                last = copy(frames[actual_anim_frame - 1]);
-            }            
-
-            interpolateAndUpdate(actual, last);
-        }, 16);
+    for(var m = 0; m < mantain.length; m++){
+        stage.addChild(mantain[m]);
     }
-    else {
-        setTimeout(function () {
-            interpolateAndUpdate(actual, last);
-        }, 16);
+
+    console.log(cancontinue, 'diff');
+
+    if(cancontinue <= 5){
+        actualframe++;
+        if(frames[actualframe + 1] !== undefined){
+            console.log('new');
+            actual = copy(frames[actualframe + 1]);
+            last = copy(frames[actualframe]);
+        }
+        else{
+            console.log('back');
+            actualframe = 0;
+            actual = copy(frames[1]);
+            last = copy(frames[0]);
+        }
     }
 
     stage.update();
+
+    console.log(last);
+
+    is_animating = false;
+
+    count_++;
+    setTimeout(function(){
+        interpolateAndUpdate(actual, last);
+    }, 16)
 }
 
-function checkPosition(x, y, tx, ty){
+function checkPosition(x, y, tx, ty) {
     var ok = true;
     var xdiff = parseInt(x - tx);
     var ydiff = parseInt(y - ty);
 
-    if(xdiff <= -1 && xdiff >= 1){
+    if (xdiff <= -1 && xdiff >= 1) {
         ok = false;
     }
-    
-    if(ydiff <= -1 && ydiff >= 1){
+
+    if (ydiff <= -1 && ydiff >= 1) {
         ok = false;
     }
 
     return ok;
 }
 
-function copy(arr){
+function lerp(a, b, t) {
+    var len = a.length;
+    if (b.length != len) {
+        return;
+    }
+
+    var x = [];
+    for (var i = 0; i < len; i++) {
+        x.push(a[i] + t * (b[i] - a[i]));
+    }
+    return x;
+}
+
+function copy(arr) {
     return JSON.parse(JSON.stringify(arr));
 }
 
