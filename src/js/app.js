@@ -10,6 +10,9 @@ var tools = {
     move: {
         active: false
     },
+    create_circle: {
+        active: false
+    },
     create_point: {
         active: false
     },
@@ -23,6 +26,11 @@ var tools = {
 
 $(document).ready(function () {
     stage = new createjs.Stage('app-main');
+
+    stage.mouse = {
+
+    };
+
     set100();
     createjs.Ticker.addEventListener($('body')[0]);
     // addNewPoint(0, 0);
@@ -31,8 +39,38 @@ $(document).ready(function () {
         if (tools.create_point.active === true) {
             addNewPoint(evt.stageX, evt.stageY);
         }
+
         point_is_moving = false;
     });
+
+    $('canvas').mousedown(function (e) {
+        stage.mouse.mousedown = true;
+        if (tools.select.active === true) {
+            handleSelect();
+        }
+
+        if (tools.create_circle.active === true) {
+            handleCreateCircle();
+        }
+    });
+
+    $('canvas').mouseup(function (e) {
+        stage.mouse.mousedown = false;
+        stopSelect();
+    });
+
+    $('canvas').mousemove(function (event) {
+        stage.mouse.x = event.pageX;
+        stage.mouse.y = event.pageY;
+
+        if (stage.mouse.mousedown === true) {
+            if (tools.select.active === true) {
+                handleSelect();
+            }
+        }
+    });
+
+
     stage.update();
     stage.enableMouseOver();
 
@@ -72,6 +110,21 @@ function addNewPoint(x, y) {
 
 function handleMousePressMove(evt) {
     if (tools.move.active === true) {
+        for (var p = 0; p < points.length; p++) {
+            var point = points[p];
+
+            if (point.isSelected === true) {
+                if (point.diffSelect === undefined) {
+                    point.diffSelect = {
+                        x: point.x - evt.stageX,
+                        y: point.y - evt.stageY
+                    }
+                }
+                point.x = evt.stageX + point.diffSelect.x;
+                point.y = evt.stageY + point.diffSelect.y;
+            }
+        }
+
         evt.target.x = evt.stageX;
         evt.target.y = evt.stageY;
         point_is_moving = true;
@@ -114,8 +167,10 @@ function handleMouseIn(e, b) {
 }
 
 function handleMouseOut(e, b) {
-    e.currentTarget.graphics.command.radius = 2;
-    stage.update();
+    if(e.currentTarget.isSelected !== true){
+        e.currentTarget.graphics.command.radius = 2;
+        stage.update();
+    }
     hover = false;
 }
 
@@ -162,6 +217,18 @@ function recalculateLines() {
     }
 }
 
+function generateCircle(x, y, radius, steps) {
+    var points = [];
+    for (var i = 0; i < steps; i++) {
+        cx = (x + radius * Math.cos(2 * Math.PI * i / steps));
+        cy = (y + radius * Math.sin(2 * Math.PI * i / steps));
+        points.push({ x: cx, y: cy });
+        addNewPoint(cx, cy);
+    }
+
+    console.log(points);
+}
+
 function update() {
     if (point_is_moving === true) {
         recalculateLines();
@@ -196,7 +263,6 @@ function interpolateAndUpdate(actual, last) {
     stage.removeAllChildren();
     for (var i = 0; i < actual.length; i++) {
         var l = lerp([last[i].x, last[i].y], [actual[i].x, actual[i].y], time);
-        console.log(l);
         var circle = new createjs.Shape();
         circle.graphics.beginStroke("#ff0000").beginFill('rgba(255,0,0)').drawCircle(0, 0, 2);
         circle.x = l[0];
@@ -204,41 +270,38 @@ function interpolateAndUpdate(actual, last) {
 
         last[i].x = l[0];
         last[i].y = l[1];
-        var dist = Math.sqrt(Math.pow((l[0]-actual[i].x), 2) + Math.pow((l[1]-actual[i].y), 2) );
+        var dist = Math.sqrt(Math.pow((l[0] - actual[i].x), 2) + Math.pow((l[1] - actual[i].y), 2));
         cancontinue += dist;
 
         var line = new createjs.Shape();
-        if(last[last[i].parent_node]){            
+        if (last[last[i].parent_node]) {
             line.graphics.setStrokeStyle(1).beginStroke("rgba(255,0,0,0.7)");
             line.graphics.moveTo(last[i].x, last[i].y);
             line.graphics.lineTo(last[last[i].parent_node].x, last[last[i].parent_node].y);
         }
 
-        if(count_ % 3 === 0){
+        if (count_ % 3 === 0) {
             mantain.push(circle);
             mantain.push(line);
         }
-        else{
+        else {
             stage.addChild(circle);
             stage.addChild(line);
         }
     }
 
 
-    for(var m = 0; m < mantain.length; m++){
+    for (var m = 0; m < mantain.length; m++) {
         stage.addChild(mantain[m]);
     }
 
-    console.log(cancontinue, 'diff');
-
-    if(cancontinue <= 5){
+    if (cancontinue <= 5) {
         actualframe++;
-        if(frames[actualframe + 1] !== undefined){
-            console.log('new');
+        if (frames[actualframe + 1] !== undefined) {
             actual = copy(frames[actualframe + 1]);
             last = copy(frames[actualframe]);
         }
-        else{
+        else {
             console.log('back');
             actualframe = 0;
             actual = copy(frames[1]);
@@ -246,14 +309,11 @@ function interpolateAndUpdate(actual, last) {
         }
     }
 
-    stage.update();
-
-    console.log(last);
-
     is_animating = false;
 
     count_++;
-    setTimeout(function(){
+    setTimeout(function () {
+        stage.update();
         interpolateAndUpdate(actual, last);
     }, 16)
 }
@@ -481,6 +541,11 @@ function bindUIEvents() {
         tools.create_point.active = true;
     });
 
+    $('.js-add-newcircle').click(function () {
+        resetAllTools();
+        tools.create_circle.active = true;
+    });
+
     $('.js-move').click(function () {
         resetAllTools();
         tools.move.active = true;
@@ -493,6 +558,8 @@ function bindUIEvents() {
     $('.js-remove-point').click(function () {
         resetAllTools();
     });
+
+    $('.js-select-area').click(startSelect);
 }
 
 setInterval(update, 16);
